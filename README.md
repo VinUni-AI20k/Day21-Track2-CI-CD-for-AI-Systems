@@ -209,6 +209,29 @@ pyyaml==6.0.1
 
 ---
 
+## VM Setup Status
+
+### EC2 Instance Details
+- **Instance ID**: i-042eeaac684f7d403
+- **Public IP**: 13.239.11.6
+- **Region**: ap-southeast-2
+- **Instance Type**: t3.micro
+- **Security Group**: sg-0049f08a169adc409 (mlops-sg)
+
+### Service Status
+- **Service Name**: mlops-serve
+- **API Port**: 8000
+- **Endpoints**:
+  - GET /health - Health check
+  - POST /predict - Wine quality prediction
+
+### Deployed Components
+- FastAPI server with Uvicorn
+- Model served from S3 bucket: mlops-wine-quality-dung/models/latest/model.pkl
+- Systemd service with auto-restart enabled
+
+---
+
 ## Hướng Dẫn Lab
 
 | Bước | Nội dung | File hướng dẫn |

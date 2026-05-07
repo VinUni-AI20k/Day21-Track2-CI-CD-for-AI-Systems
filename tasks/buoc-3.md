@@ -119,10 +119,10 @@ Tải file `outputs/metrics.json` từ artifacts của hai lần chạy để so
 
 | Chỉ số | Bước 2 (2998 mẫu) | Bước 3 (5996 mẫu) |
 |---|---|---|
-| accuracy | ? | ? |
-| f1_score | ? | ? |
+| accuracy | 0.68 | **0.748** |
+| f1_score | 0.6778 | **0.7477** |
 
-Điền vào bảng trên dựa trên kết quả thực tế của bạn. Nếu mô hình mới có accuracy cao hơn, điều đó chứng tỏ thêm dữ liệu làm tăng hiệu quả mô hình.
+**Nhận xét:** Mô hình Bước 3 đạt accuracy cao hơn **+6.8%** so với Bước 2 nhờ tập dữ liệu huấn luyện tăng gấp đôi (5996 mẫu thay vì 2998 mẫu). Điều này chứng tỏ việc bổ sung dữ liệu mới (train_phase2) cải thiện đáng kể khả năng phân loại của mô hình, đặc biệt ở class 2 (recall tăng từ 0.55 → 0.65). Ngoài ra, precision trên class 2 cũng tăng mạnh (0.679 → 0.844).
 
 ---
 

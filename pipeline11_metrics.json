@@ -1,0 +1,29 @@
+{
+  "accuracy": 0.68,
+  "f1_score": 0.6778393079129583,
+  "model_type": "random_forest",
+  "label_distribution": {
+    "0": {
+      "count": 1078,
+      "ratio": 0.3596
+    },
+    "1": {
+      "count": 1330,
+      "ratio": 0.4436
+    },
+    "2": {
+      "count": 590,
+      "ratio": 0.1968
+    }
+  },
+  "precision_per_class": [
+    0.7074,
+    0.658,
+    0.679
+  ],
+  "recall_per_class": [
+    0.7688,
+    0.6696,
+    0.55
+  ]
+}

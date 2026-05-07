@@ -178,39 +178,61 @@ jobs:
     needs: train
     runs-on: ubuntu-latest
     steps:
-      - name: Configure AWS credentials
+      - name: Download previous metrics for rollback check
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
         run: |
-          echo "AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID" >> $GITHUB_ENV
-          echo "AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY" >> $GITHUB_ENV
-          echo "AWS_S3_BUCKET=$AWS_S3_BUCKET" >> $GITHUB_ENV
+          aws s3 cp s3://$AWS_S3_BUCKET/models/latest/metrics.json /tmp/prev_metrics.json 2>/dev/null && \
+            echo "Previous metrics found for rollback check (Bonus 4)" || \
+            echo "No previous metrics on S3 — first run"
 
-      - name: Check eval gate and upload metrics
+      - name: Check eval gate - download metrics from S3 and evaluate
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
         run: |
-          ACC=${{ needs.train.outputs.accuracy }}
-          MT=${{ needs.train.outputs.model_type }}
+          aws s3 cp s3://$AWS_S3_BUCKET/models/latest/metrics.json /tmp/metrics.json
+          python3 - <<'PYEOF'
+          import json
+          with open("/tmp/metrics.json") as f:
+              metrics = json.load(f)
+          acc = float(metrics["accuracy"])
+          mt = metrics.get("model_type", "unknown")
+          label_dist = metrics.get("label_distribution", {})
+          print(f"Current model accuracy : {acc:.4f}")
+          print(f"Model type             : {mt}")
 
-          # Fallback: if ACC is empty (workflow_dispatch), download from S3
-          if [ -z "$ACC" ] || [ "$ACC" = "null" ]; then
-            echo "No accuracy from outputs, downloading from S3..."
-            aws s3 cp s3://$AWS_S3_BUCKET/models/latest/metrics.json /tmp/metrics.json 2>/dev/null && \
-              ACC=$(python3 -c "import json; print(json.load(open('/tmp/metrics.json'))['accuracy'])") || \
-              ACC=""
-          fi
+          # Bonus 5: Data distribution warning
+          for label, info in label_dist.items():
+              ratio = info["ratio"]
+              if ratio < 0.10:
+                  print(f"WARNING: Class {label} has only {ratio:.1%} of samples (< 10%)")
 
-          echo "Current model accuracy : $ACC"
-          echo "Model type           : $MT"
+          # Bonus 4: Rollback check
+          try:
+              with open("/tmp/prev_metrics.json") as f:
+                  prev = json.load(f)
+              prev_acc = float(prev.get("accuracy", 0.0))
+              if prev_acc > 0.0:
+                  print(f"\nPrevious model accuracy : {prev_acc:.4f}")
+                  if acc < prev_acc:
+                      print(f"WARNING: New accuracy {acc:.4f} < Previous {prev_acc:.4f}")
+                      print("Continuing deploy (above threshold, but model is worse)")
+                  else:
+                      print(f"OK: New model is better (+{acc - prev_acc:.4f})")
+          except:
+              pass
 
-          if [ -z "$ACC" ]; then
-            echo "ERROR: Cannot determine accuracy (no output and no S3 file)"
-            exit 1
-          fi
-
-          # Check accuracy >= 0.70
-          python3 -c "acc=float('$ACC'); print(f'PASSED: accuracy {acc:.4f} >= 0.70') if acc >= 0.70 else (print(f'FAILED: accuracy {acc:.4f} < 0.70'), exit(1))"
+          # Eval gate
+          if acc < 0.70:
+              print(f"\nFAILED: accuracy {acc:.4f} < 0.70 — deploy blocked.")
+              raise SystemExit(1)
+          print(f"PASSED: accuracy {acc:.4f} >= 0.70")
+          print("\nEVAL GATE PASSED — proceeding to deploy")
+          PYEOF
 
 
   # ---------------------------------------------------------------------------

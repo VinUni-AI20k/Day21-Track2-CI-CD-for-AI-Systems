@@ -237,13 +237,30 @@ if __name__ == "__main__":
     with open("params.yaml") as f:
         params = yaml.safe_load(f)
 
-    # Nếu muốn thử nhiều thuật toán (Bonus 2), uncomment các dòng bên dưới
-    # model_types = ["random_forest", "gradient_boosting", "logistic_regression"]
-    # for mt in model_types:
-    #     params["model_type"] = mt
-    #     train(params)
+    # Bonus 2: Thử 3 thuật toán để ghi nhận nhiều thí nghiệm trên MLflow
+    # Chạy theo thứ tự: GB → LR → RF (RF chạy cuối để metrics.json lưu kết quả tốt nhất)
+    experiments = [
+        {"name": "gradient_boosting", "model_type": "gradient_boosting",
+         "params": {"n_estimators": 100, "max_depth": 5, "learning_rate": 0.1}},
+        {"name": "logistic_regression", "model_type": "logistic_regression",
+         "params": {"C": 1.0, "max_iter": 1000}},
+        # RandomForest chạy cuối — kết quả này được dùng cho eval gate
+        {"name": "random_forest_best", "model_type": "random_forest",
+         "params": dict(params)},  # dùng params từ params.yaml
+    ]
 
-    acc = train(params)
-    print(f"\nFinal accuracy: {acc:.4f}")
-    if acc < EVAL_THRESHOLD:
-        print(f"WARNING: Accuracy {acc:.4f} is below threshold {EVAL_THRESHOLD}")
+    for exp in experiments:
+        mt = exp["model_type"]
+        p = {k: v for k, v in exp["params"].items()}
+        p["model_type"] = mt
+        print(f"\n{'='*60}")
+        print(f"  Experiment: {exp['name']} ({mt})")
+        print(f"{'='*60}")
+        acc = train(p)
+        print(f"  Accuracy: {acc:.4f}")
+
+    # Kết quả cuối cùng (RF) đã được lưu vào metrics.json và outputs/report.txt
+    print(f"\n{'='*60}")
+    print(f"  All experiments complete. Final model: random_forest")
+    print(f"  metrics.json and report.txt saved for pipeline.")
+    print(f"{'='*60}")

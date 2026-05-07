@@ -93,7 +93,7 @@ jobs:
           name: metrics
           path: outputs/metrics.json
 
-      - name: Bonus 3: Upload performance report
+      - name: Bonus 3 Upload performance report
         uses: actions/upload-artifact@v4
         with:
           name: report

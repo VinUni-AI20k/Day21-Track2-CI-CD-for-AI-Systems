@@ -25,12 +25,14 @@ os.makedirs("models", exist_ok=True)
 
 def get_model(model_type: str, params: dict):
     """Instantiate a model based on model_type."""
-    if model_type == "random_forest":
-        return RandomForestClassifier(**params, random_state=42)
-    elif model_type == "gradient_boosting":
+    if model_type == "gradient_boosting":
         return GradientBoostingClassifier(**params, random_state=42)
     elif model_type == "logistic_regression":
-        return LogisticRegression(**params, random_state=42, max_iter=1000)
+        ml_params = {k: v for k, v in params.items() if k != "max_iter"}
+        max_iter_val = params.get("max_iter", 1000)
+        return LogisticRegression(random_state=42, max_iter=max_iter_val, **ml_params)
+    elif model_type == "random_forest":
+        return RandomForestClassifier(**params, random_state=42)
     else:
         raise ValueError(f"Unknown model_type: {model_type}")
 
@@ -130,8 +132,15 @@ def train(
         accuracy (float): độ chính xác trên tập đánh giá
     """
 
-    # Đọc siêu tham số
-    model_type = params.pop("model_type", "random_forest")
+    # Xác định model_type từ params nếu không được chỉ định rõ
+    if "model_type" in params:
+        model_type = params.pop("model_type")
+    elif "learning_rate" in params:
+        model_type = "gradient_boosting"
+    elif "C" in params:
+        model_type = "logistic_regression"
+    else:
+        model_type = "random_forest"
 
     # Bonus 5: Kiểm tra data drift trước khi huấn luyện
     df_train_check = pd.read_csv(data_path)

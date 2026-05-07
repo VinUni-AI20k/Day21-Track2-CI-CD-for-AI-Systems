@@ -170,6 +170,10 @@ jobs:
     needs: train
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
       - name: Download current metrics artifact
         uses: actions/download-artifact@v4
         with:
@@ -177,10 +181,6 @@ jobs:
           path: outputs/
 
       - name: Check eval gate and rollback
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
         run: |
           python - <<'EOF'
           import json
@@ -238,22 +238,6 @@ jobs:
                   print(f"OK: New model is better or equal (+{acc - prev_acc:.4f})")
           else:
               print("\nNo previous metrics found — this is the first run")
-
-          # Upload final metrics to S3 for next-run comparison
-          import boto3
-          bucket = os.environ.get("AWS_S3_BUCKET", "")
-          if bucket:
-              try:
-                  s3 = boto3.client("s3")
-                  s3.upload_file(
-                      "outputs/metrics.json",
-                      bucket,
-                      "models/latest/metrics.json",
-                      ExtraArgs={"ContentType": "application/json"}
-                  )
-                  print("Uploaded metrics.json to S3 for next run comparison")
-              except Exception as e:
-                  print(f"WARNING: Could not upload metrics to S3: {e}")
 
           print("\nEVAL GATE PASSED — proceeding to deploy")
           EOF

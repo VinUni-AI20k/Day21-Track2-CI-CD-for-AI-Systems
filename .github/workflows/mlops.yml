@@ -139,6 +139,7 @@ jobs:
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
           script: |
+            pip3 install --user lightgbm==4.6.0 scikit-learn==1.4.2 joblib==1.4.2
             sudo systemctl restart mlops-serve
             for i in 1 2 3 4 5 6; do
               sleep 5

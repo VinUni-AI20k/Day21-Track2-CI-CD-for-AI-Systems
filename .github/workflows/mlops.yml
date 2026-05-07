@@ -186,9 +186,23 @@ jobs:
           import json
           import os
 
+          # Debug: print all files in outputs/
+          print("Files in outputs/:")
+          if os.path.exists("outputs"):
+              for f in os.listdir("outputs"):
+                  print(f"  {f}")
+          else:
+              print("  outputs/ directory not found!")
+
           # Load current metrics
+          if not os.path.exists("outputs/metrics.json"):
+              print("ERROR: outputs/metrics.json not found!")
+              import sys; sys.exit(1)
+
           with open("outputs/metrics.json") as f:
-              current = json.load(f)
+              raw = f.read()
+              print(f"metrics.json raw content: {raw[:200]}")
+              current = json.loads(raw)
 
           acc = float(current["accuracy"])
           model_type = current.get("model_type", "unknown")
@@ -215,26 +229,31 @@ jobs:
           if os.path.exists(prev_path):
               with open(prev_path) as f:
                   prev = json.load(f)
-              prev_acc = float(prev["accuracy"])
+              prev_acc = float(prev.get("accuracy", 0.0))
               print(f"\nPrevious model accuracy : {prev_acc:.4f}")
-              if acc < prev_acc:
+              if acc < prev_acc and prev_acc > 0.0:
                   print(f"WARNING: New accuracy {acc:.4f} < Previous {prev_acc:.4f}")
                   print("Continuing deploy (new model is worse but above threshold)")
               else:
                   print(f"OK: New model is better or equal (+{acc - prev_acc:.4f})")
+          else:
+              print("\nNo previous metrics found — this is the first run")
 
           # Upload final metrics to S3 for next-run comparison
           import boto3
           bucket = os.environ.get("AWS_S3_BUCKET", "")
           if bucket:
-              s3 = boto3.client("s3")
-              s3.upload_file(
-                  "outputs/metrics.json",
-                  bucket,
-                  "models/latest/metrics.json",
-                  ExtraArgs={"ContentType": "application/json"}
-              )
-              print("Uploaded metrics.json to S3 for next run comparison")
+              try:
+                  s3 = boto3.client("s3")
+                  s3.upload_file(
+                      "outputs/metrics.json",
+                      bucket,
+                      "models/latest/metrics.json",
+                      ExtraArgs={"ContentType": "application/json"}
+                  )
+                  print("Uploaded metrics.json to S3 for next run comparison")
+              except Exception as e:
+                  print(f"WARNING: Could not upload metrics to S3: {e}")
 
           print("\nEVAL GATE PASSED — proceeding to deploy")
           EOF

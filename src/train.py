@@ -5,12 +5,115 @@ import yaml
 import json
 import joblib
 import os
-from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.ensemble import (
+    ExtraTreesClassifier,
+    GradientBoostingClassifier,
+    HistGradientBoostingClassifier,
+    RandomForestClassifier,
+    VotingClassifier,
+)
 from sklearn.metrics import accuracy_score, f1_score
 import warnings
 warnings.filterwarnings("ignore")
 
 EVAL_THRESHOLD = 0.70
+
+
+def _build_model(params: dict):
+    model_type = str(params.get("model_type", "voting")).lower()
+
+    if model_type == "rf":
+        model = RandomForestClassifier(
+            n_estimators=params.get("n_estimators", 800),
+            max_depth=params.get("max_depth", None),
+            min_samples_split=params.get("min_samples_split", 2),
+            max_features=params.get("max_features", "sqrt"),
+            random_state=42,
+            n_jobs=-1,
+        )
+        return model, model_type
+
+    if model_type == "et":
+        model = ExtraTreesClassifier(
+            n_estimators=params.get("n_estimators", 800),
+            max_depth=params.get("max_depth", None),
+            min_samples_split=params.get("min_samples_split", 2),
+            max_features=params.get("max_features", "sqrt"),
+            random_state=42,
+            n_jobs=-1,
+        )
+        return model, model_type
+
+    if model_type == "gb":
+        model = GradientBoostingClassifier(
+            n_estimators=params.get("n_estimators", 600),
+            learning_rate=params.get("learning_rate", 0.04),
+            max_depth=params.get("max_depth", 4),
+            random_state=42,
+        )
+        return model, model_type
+
+    if model_type == "hgb":
+        model = HistGradientBoostingClassifier(
+            max_iter=params.get("max_iter", 900),
+            learning_rate=params.get("learning_rate", 0.02),
+            max_depth=params.get("max_depth", 16),
+            random_state=42,
+        )
+        return model, model_type
+
+    if model_type == "lgbm":
+        from lightgbm import LGBMClassifier
+
+        model = LGBMClassifier(
+            objective="multiclass",
+            num_class=3,
+            n_estimators=params.get("n_estimators", 900),
+            learning_rate=params.get("learning_rate", 0.03),
+            num_leaves=params.get("num_leaves", 63),
+            max_depth=params.get("max_depth", -1),
+            subsample=params.get("subsample", 0.9),
+            colsample_bytree=params.get("colsample_bytree", 0.9),
+            min_child_samples=params.get("min_child_samples", 20),
+            random_state=42,
+            verbosity=-1,
+        )
+        return model, model_type
+
+    if model_type == "voting":
+        from lightgbm import LGBMClassifier
+
+        et = ExtraTreesClassifier(
+            n_estimators=params.get("et_n_estimators", 1000),
+            max_features=params.get("et_max_features", "sqrt"),
+            random_state=42,
+            n_jobs=-1,
+        )
+        rf = RandomForestClassifier(
+            n_estimators=params.get("rf_n_estimators", 1200),
+            max_features=params.get("rf_max_features", "sqrt"),
+            random_state=42,
+            n_jobs=-1,
+        )
+        lgbm = LGBMClassifier(
+            objective="multiclass",
+            num_class=3,
+            n_estimators=params.get("lgbm_n_estimators", 900),
+            learning_rate=params.get("lgbm_learning_rate", 0.03),
+            num_leaves=params.get("lgbm_num_leaves", 63),
+            max_depth=params.get("lgbm_max_depth", -1),
+            subsample=params.get("lgbm_subsample", 0.9),
+            colsample_bytree=params.get("lgbm_colsample_bytree", 0.9),
+            random_state=42,
+            verbosity=-1,
+        )
+        model = VotingClassifier(
+            estimators=[("et", et), ("rf", rf), ("lgbm", lgbm)],
+            voting="soft",
+        )
+        return model, model_type
+
+    raise ValueError(f"Unsupported model_type: {model_type}")
 
 
 def train(
@@ -22,7 +125,7 @@ def train(
     Huan luyen mo hinh va ghi nhan ket qua vao MLflow.
 
     Tham so:
-        params     : dict chua cac sieu tham so cho ExtraTreesClassifier.
+        params     : dict chua model_type va cac sieu tham so.
         data_path  : duong dan den file du lieu huan luyen.
         eval_path  : duong dan den file du lieu danh gia.
 
@@ -53,19 +156,13 @@ def train(
     with mlflow.start_run():
 
         # TODO 3: Ghi nhan cac sieu tham so
-        model_params = {
-            "n_estimators": params.get("n_estimators", 800),
-            "max_depth": params.get("max_depth", None),
-            "min_samples_split": params.get("min_samples_split", 2),
-            "max_features": params.get("max_features", "sqrt"),
-        }
+        model, model_type = _build_model(params)
         mlflow.log_params(params)
-        mlflow.log_param("model_type", "ExtraTreesClassifier")
+        mlflow.log_param("model_type", model_type)
         mlflow.log_param("train_rows", int(len(df_train)))
 
-        # TODO 4: Khoi tao va huan luyen ExtraTreesClassifier
+        # TODO 4: Khoi tao va huan luyen model
         # Goi y: su dung random_state=42 de dam bao tinh tai tao
-        model = ExtraTreesClassifier(**model_params, random_state=42, n_jobs=-1)
         model.fit(X_train, y_train)
 
         # TODO 5: Du doan tren tap danh gia va tinh chi so

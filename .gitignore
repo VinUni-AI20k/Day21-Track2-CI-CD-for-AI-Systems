@@ -13,3 +13,12 @@ __pycache__/
 .DS_Store
 .dvc/tmp/
 .dvc/cache/
+mlruns/
+mlops-key
+mlops-key.pub
+cred_input.txt
+generate_key.sh
+gh_auth.bat
+model.pkl
+test_api.py
+test_predict.py

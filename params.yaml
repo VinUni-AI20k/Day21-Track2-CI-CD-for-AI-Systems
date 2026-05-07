@@ -1,8 +1,6 @@
-# Tuned Random Forest - optimized for accuracy
+# Best Random Forest - trained on phase1+phase2 (5996 samples)
 model_type: random_forest
 n_estimators: 500
 max_depth: null
-min_samples_split: 3
-min_samples_leaf: 2
-max_features: sqrt
-bootstrap: false
+min_samples_split: 2
+min_samples_leaf: 1

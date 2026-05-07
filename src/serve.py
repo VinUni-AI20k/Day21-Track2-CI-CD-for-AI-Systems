@@ -27,7 +27,13 @@ def download_model():
 
     # TODO 3: Tai file model xuong may
     os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
-    blob.download_to_filename(MODEL_PATH)
+    try:
+        blob.download_to_filename(MODEL_PATH, timeout=(5, 30))
+    except Exception as exc:
+        if os.path.exists(MODEL_PATH):
+            print(f"Khong tai duoc model moi tu GCS, su dung model local: {exc}")
+            return
+        raise RuntimeError(f"Khong the tai model tu GCS va khong co model local: {exc}") from exc
 
     # TODO 4: In thong bao thanh cong
     print("Model da duoc tai xuong tu GCS.")

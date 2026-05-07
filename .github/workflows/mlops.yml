@@ -139,13 +139,33 @@ jobs:
           host: ${{ secrets.VM_HOST }}
           username: ${{ secrets.VM_USER }}
           key: ${{ secrets.VM_SSH_KEY }}
+          timeout: 30s
+          command_timeout: 4m
           script: |
-            pip3 install --user lightgbm==4.6.0 scikit-learn==1.4.2 joblib==1.4.2
+            set -e
+            python3 - <<'PY'
+            import importlib
+            modules = [
+              "fastapi",
+              "uvicorn",
+              "joblib",
+              "sklearn",
+              "google.cloud.storage",
+            ]
+            missing = [m for m in modules if importlib.util.find_spec(m) is None]
+            print("MISSING_MODULES=", ",".join(missing) if missing else "none")
+            PY
+            if ! python3 -c "import fastapi, uvicorn, joblib, sklearn, google.cloud.storage" >/dev/null 2>&1; then
+              echo "Installing missing runtime dependencies..."
+              pip3 install --user fastapi uvicorn scikit-learn==1.4.2 joblib==1.4.2 google-cloud-storage
+            fi
+            START_TS=$(date +%s)
             sudo systemctl restart mlops-serve
-            for i in $(seq 1 24); do
-              sleep 5
-              if curl -sf http://localhost:8000/health; then
-                echo "Health check passed."
+            for i in $(seq 1 20); do
+              sleep 2
+              if curl -sf --max-time 2 http://localhost:8000/health >/dev/null; then
+                ELAPSED=$(( $(date +%s) - START_TS ))
+                echo "Health check passed in ${ELAPSED}s."
                 exit 0
               fi
               echo "Health check failed on attempt $i, retrying..."

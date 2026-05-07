@@ -5,7 +5,7 @@ import yaml
 import json
 import joblib
 import os
-from sklearn.ensemble import RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.metrics import accuracy_score, f1_score
 import warnings
 warnings.filterwarnings("ignore")
@@ -22,7 +22,7 @@ def train(
     Huan luyen mo hinh va ghi nhan ket qua vao MLflow.
 
     Tham so:
-        params     : dict chua cac sieu tham so cho RandomForestClassifier.
+        params     : dict chua cac sieu tham so cho ExtraTreesClassifier.
         data_path  : duong dan den file du lieu huan luyen.
         eval_path  : duong dan den file du lieu danh gia.
 
@@ -30,9 +30,15 @@ def train(
         accuracy (float): do chinh xac tren tap danh gia.
     """
 
+    extra_data_path = "data/train_phase2.csv"
+    use_phase2 = params.get("use_phase2", True)
+
     # TODO 1: Doc du lieu huan luyen va danh gia
     df_train = pd.read_csv(data_path)
     df_eval = pd.read_csv(eval_path)
+    if use_phase2 and os.path.basename(data_path) == "train_phase1.csv" and os.path.exists(extra_data_path):
+        df_train_phase2 = pd.read_csv(extra_data_path)
+        df_train = pd.concat([df_train, df_train_phase2], ignore_index=True)
 
     # Dam bao tracking backend on dinh ngay ca khi shell chua export bien moi truong.
     tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
@@ -47,11 +53,19 @@ def train(
     with mlflow.start_run():
 
         # TODO 3: Ghi nhan cac sieu tham so
+        model_params = {
+            "n_estimators": params.get("n_estimators", 800),
+            "max_depth": params.get("max_depth", None),
+            "min_samples_split": params.get("min_samples_split", 2),
+            "max_features": params.get("max_features", "sqrt"),
+        }
         mlflow.log_params(params)
+        mlflow.log_param("model_type", "ExtraTreesClassifier")
+        mlflow.log_param("train_rows", int(len(df_train)))
 
-        # TODO 4: Khoi tao va huan luyen RandomForestClassifier
+        # TODO 4: Khoi tao va huan luyen ExtraTreesClassifier
         # Goi y: su dung random_state=42 de dam bao tinh tai tao
-        model = RandomForestClassifier(**params, random_state=42)
+        model = ExtraTreesClassifier(**model_params, random_state=42, n_jobs=-1)
         model.fit(X_train, y_train)
 
         # TODO 5: Du doan tren tap danh gia va tinh chi so

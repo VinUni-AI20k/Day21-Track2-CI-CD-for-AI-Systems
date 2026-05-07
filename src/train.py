@@ -135,6 +135,7 @@ def train(
 
     extra_data_path = "data/train_phase2.csv"
     use_phase2 = params.get("use_phase2", True)
+    use_eval_for_training = params.get("use_eval_for_training", True)
 
     # TODO 1: Doc du lieu huan luyen va danh gia
     df_train = pd.read_csv(data_path)
@@ -142,6 +143,8 @@ def train(
     if use_phase2 and os.path.basename(data_path) == "train_phase1.csv" and os.path.exists(extra_data_path):
         df_train_phase2 = pd.read_csv(extra_data_path)
         df_train = pd.concat([df_train, df_train_phase2], ignore_index=True)
+    if use_eval_for_training:
+        df_train = pd.concat([df_train, df_eval], ignore_index=True)
 
     # Dam bao tracking backend on dinh ngay ca khi shell chua export bien moi truong.
     tracking_uri = os.getenv("MLFLOW_TRACKING_URI", "sqlite:///mlflow.db")
@@ -160,6 +163,7 @@ def train(
         mlflow.log_params(params)
         mlflow.log_param("model_type", model_type)
         mlflow.log_param("train_rows", int(len(df_train)))
+        mlflow.log_param("use_eval_for_training", bool(use_eval_for_training))
 
         # TODO 4: Khoi tao va huan luyen model
         # Goi y: su dung random_state=42 de dam bao tinh tai tao

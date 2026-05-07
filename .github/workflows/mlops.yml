@@ -203,6 +203,12 @@ jobs:
     if: needs.rollback_check.outputs.should_deploy == 'true'
     steps:
 
+      - name: Download metrics artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: metrics
+          path: outputs
+
       - name: SSH deploy to VM
         uses: appleboy/ssh-action@v1.0.3
         with:

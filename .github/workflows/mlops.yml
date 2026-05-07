@@ -93,6 +93,12 @@ jobs:
           name: metrics
           path: outputs/metrics.json
 
+      - name: Bonus 3: Upload performance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: report
+          path: outputs/report.txt
+
 
   # ---------------------------------------------------------------------------
   # JOB 3 - EVAL
@@ -117,14 +123,84 @@ jobs:
 
 
   # ---------------------------------------------------------------------------
-  # JOB 4 - DEPLOY
-  # Trien khai len VM qua SSH.
+  # JOB 4 - ROLLBACK CHECK (Bonus 4)
+  # Kiem tra xem model moi co tot hon model cu khong.
+  # Chi deploy khi accuracy moi >= accuracy cu.
   # Chi chay khi Job 3 (Eval) hoan thanh thanh cong.
+  # ---------------------------------------------------------------------------
+  rollback_check:
+    name: Rollback Check
+    needs: [train, eval]
+    runs-on: ubuntu-latest
+    outputs:
+      should_deploy: ${{ steps.compare_accuracy.outputs.should_deploy }}
+    steps:
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install boto3
+        run: pip install boto3
+
+      - name: Bonus 4: Compare with previous model
+        id: compare_accuracy
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
+        run: |
+          python - <<'EOF'
+          import os
+          import json
+          import boto3
+
+          new_acc = float("${{ needs.train.outputs.accuracy }}")
+          bucket = os.environ["CLOUD_BUCKET"]
+          s3 = boto3.client('s3')
+
+          # Thu tai metrics.json cu tu S3
+          old_acc = None
+          try:
+              s3.download_file(bucket, "metrics/metrics.json", "/tmp/old_metrics.json")
+              with open("/tmp/old_metrics.json") as f:
+                  old_data = json.load(f)
+              old_acc = old_data["accuracy"]
+              print(f"Accuracy cu: {old_acc:.4f}")
+          except Exception as e:
+              print(f"Khong tim thay metrics cu (dau tien deploy): {e}")
+              old_acc = None
+
+          print(f"Accuracy moi: {new_acc:.4f}")
+
+          # So sanh
+          if old_acc is None:
+              should_deploy = "true"
+              print(">>> Dau tien deploy, cho phep deploy.")
+          elif new_acc >= old_acc:
+              should_deploy = "true"
+              print(f">>> PASS: Accuracy moi ({new_acc:.4f}) >= Accuracy cu ({old_acc:.4f}). Cho phep deploy.")
+          else:
+              should_deploy = "false"
+              print(f">>> FAIL: Accuracy moi ({new_acc:.4f}) < Accuracy cu ({old_acc:.4f}). HUY DEPLOY de rollback.")
+
+          # Ghi output
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"should_deploy={should_deploy}\n")
+          EOF
+
+
+  # ---------------------------------------------------------------------------
+  # JOB 5 - DEPLOY
+  # Trien khai len VM qua SSH.
+  # Chi chay khi Job 4 (Rollback Check) hoan thanh thanh cong va cho phep deploy.
   # ---------------------------------------------------------------------------
   deploy:
     name: Deploy
-    needs: eval
+    needs: rollback_check
     runs-on: ubuntu-latest
+    if: needs.rollback_check.outputs.should_deploy == 'true'
     steps:
 
       - name: SSH deploy to VM
@@ -137,3 +213,19 @@ jobs:
             sudo systemctl restart mlops-serve
             sleep 5
             curl -sf http://localhost:8000/health && echo "Health check passed." || exit 1
+
+      - name: Bonus 4: Upload new metrics to S3 for next comparison
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          CLOUD_BUCKET: ${{ secrets.CLOUD_BUCKET }}
+        run: |
+          python - <<'EOF'
+          import os
+          import boto3
+          s3 = boto3.client('s3')
+          bucket = os.environ["CLOUD_BUCKET"]
+          s3.upload_file("outputs/metrics.json", bucket, "metrics/metrics.json")
+          print("Metrics uploaded to S3 for future comparison.")
+          EOF

@@ -143,7 +143,7 @@ jobs:
       - name: Install boto3
         run: pip install boto3
 
-      - name: Bonus 4: Compare with previous model
+      - name: Bonus 4 Compare with previous model
         id: compare_accuracy
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -214,7 +214,7 @@ jobs:
             sleep 5
             curl -sf http://localhost:8000/health && echo "Health check passed." || exit 1
 
-      - name: Bonus 4: Upload new metrics to S3 for next comparison
+      - name: Bonus 4 Upload new metrics to S3 for next comparison
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
